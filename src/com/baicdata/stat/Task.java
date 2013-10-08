@@ -444,6 +444,7 @@ public class Task implements Runnable {
 									try {
 										charge = Float
 												.parseFloat(segments[this.res_cost]);
+										changestat(pushid);
 										type = "cost";
 									} catch (Exception e) {
 
