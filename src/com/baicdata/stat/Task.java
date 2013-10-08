@@ -66,9 +66,9 @@ public class Task implements Runnable {
 			int push_date, int push_area, int push_source, int push_adid,
 			int push_pushid, int show_date, int show_area, int show_source,
 			int show_adid, int show_pushid, int click_date, int click_area,
-			int click_source, int click_adid, int click_pushid, int res_date, int res_area, int res_source, int res_adid,
-			int res_pushid, int res_cost, String url2,
-			String user2, String password2) {
+			int click_source, int click_adid, int click_pushid, int res_date,
+			int res_area, int res_source, int res_adid, int res_pushid,
+			int res_cost, String url2, String user2, String password2) {
 
 		this.formater = new SimpleDateFormat(pat);
 		this.host = h;
@@ -166,7 +166,8 @@ public class Task implements Runnable {
 				password, pat, sep, push_date, push_area, push_source,
 				push_adid, push_pushid, show_date, show_area, show_source,
 				show_adid, show_pushid, click_date, click_area, click_source,
-				click_adid, click_pushid, res_date, res_area, res_source, res_adid, res_pushid, res_cost, url2, user2, password2).run();
+				click_adid, click_pushid, res_date, res_area, res_source,
+				res_adid, res_pushid, res_cost, url2, user2, password2).run();
 	}
 
 	public String getdate(String datetime) {
@@ -249,7 +250,8 @@ public class Task implements Runnable {
 	}
 
 	public boolean isvalid(String type, String pushid) {
-		if (type.equals("bidres")) return isvalidcost(pushid);
+		if (type.equals("bidres"))
+			return isvalidcost(pushid);
 		List<DBObject> cur = this.db.getCollection("pushidstatus")
 				.find(new BasicDBObject("pushid", pushid)).toArray();
 		int a = 0;
@@ -388,7 +390,8 @@ public class Task implements Runnable {
 								T = true;
 								type = "show";
 								change = 2;
-							} else if (type.equals("rtb_bidres") && version.equals("1")) {
+							} else if (type.equals("rtb_bidres")
+									&& version.equals("1")) {
 								date = getdate(segments[this.res_date]);
 								try {
 									area = getarea(segments[this.res_area]);
@@ -437,15 +440,18 @@ public class Task implements Runnable {
 								query.put("adid", id);
 								DBObject data = new BasicDBObject();
 								float charge = 0.0f;
-								if(type.equals("bidres")) {
+								if (type.equals("bidres")) {
 									try {
-										charge = Float.parseFloat(segments[this.res_cost]);
+										charge = Float
+												.parseFloat(segments[this.res_cost]);
 										type = "cost";
-									} catch(Exception e){
+									} catch (Exception e) {
 
 									}
-								} else charge = 1;
-								data.put("$inc", new BasicDBObject(type, charge));
+								} else
+									charge = 1;
+								data.put("$inc",
+										new BasicDBObject(type, charge));
 								this.save("DayDetail", query, data);
 
 								query = new BasicDBObject();
