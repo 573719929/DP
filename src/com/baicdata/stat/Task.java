@@ -9,13 +9,18 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
 
+import com.adp.java.FlowSrc;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
+import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.Mongo;
 import java.sql.*;
@@ -313,13 +318,134 @@ public class Task implements Runnable {
 	}
 
 	private boolean save(String collection, DBObject query, DBObject data) {
-		// System.out.print(query);
-		// System.out.print("\t");
-		// System.out.println(data);
-		boolean ret = this.db.getCollection(collection)
+		return this.db.getCollection(collection)
 				.update(query, data, true, false).getN() == 1;
-		// System.out.println(ret);
+	}
+
+	public float getDayCost(String pid) {
+		float ret = 0;
+		Mongo mongo = null;
+		try {
+			mongo = new Mongo(this.host, this.port);
+		} catch (UnknownHostException e) {
+			return ret;
+		}
+		if (mongo != null) {
+			String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
+			DBCollection col = mongo.getDB(this.database).getCollection(
+					"DayDetail");
+			DBObject query = new BasicDBObject();
+			query.put("pid", pid);
+			query.put("time", today);
+			DBObject key = new BasicDBObject();
+			key.put("pid", pid);
+			DBObject cond = new BasicDBObject();
+			cond = query;
+			DBObject initial = new BasicDBObject();
+			initial.put("cost", 0);
+			String reduce = "function(curr,result){if(curr.cost!=null)result.cost+=curr.cost;}";
+			List<Object> returnList = (BasicDBList) col.group(key, cond,
+					initial, reduce);
+			// System.out.println(key);
+			// System.out.println(cond);
+			// System.out.println(initial);
+			// System.out.println(reduce);
+			for (int i = 0; i < returnList.size(); i++) {
+				try {
+					System.out.println("A");
+					ret += Float.valueOf(((DBObject) returnList.get(i)).get(
+							"cost").toString());
+				} catch (java.lang.NullPointerException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		mongo.close();
 		return ret;
+	}
+
+	private void StopAPlan(String pid) {
+		System.out.println("Stop a Plan");
+		try {
+			Class.forName(this.driver);
+			Connection conn = null;
+			try {
+				conn = DriverManager.getConnection(this.url, this.user,
+						this.password);
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+			Statement statement;
+			try {
+				statement = conn.createStatement();
+				String sql = "update adp_plan_info set enable=5 where plan_id="
+						+ pid;
+				statement.executeUpdate(sql);
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void StopAllPlan(String uid) {
+		System.out.println("Stop All Plan");
+		try {
+			Class.forName(this.driver);
+			Connection conn = null;
+			try {
+				conn = DriverManager.getConnection(this.url, this.user,
+						this.password);
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+			Statement statement;
+			try {
+				statement = conn.createStatement();
+				ArrayList<String> Pids = new ArrayList<String>();
+				String sql = "select plan_id from adp_plan_info where uid=" + uid;
+				ResultSet rs = statement.executeQuery(sql);
+				while (rs.next()) Pids.add(rs.getString("plan_id"));
+				for (String pid : Pids) {
+					sql = "update adp_plan_info set enable=5 where plan_id="+ pid;
+					statement.executeUpdate(sql);
+				}
+				statement.close();
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void CutDown(String uid, float charge) {
+		System.out.println("Cut Down");
+		try {
+			Class.forName(this.driver);
+			Connection conn = null;
+			try {
+				conn = DriverManager.getConnection(this.url, this.user,
+						this.password);
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+			Statement statement;
+			try {
+				statement = conn.createStatement();
+				String sql = "update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid;
+				statement.executeUpdate(sql);
+				statement.close();
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -442,12 +568,10 @@ public class Task implements Runnable {
 								float charge = 0.0f;
 								if (type.equals("bidres")) {
 									try {
-										charge = Float
-												.parseFloat(segments[this.res_cost]);
+										charge = Float.parseFloat(segments[this.res_cost]);
 										changestat(pushid);
 										type = "cost";
 									} catch (Exception e) {
-
 									}
 								} else
 									charge = 1;
@@ -458,17 +582,58 @@ public class Task implements Runnable {
 								query = new BasicDBObject();
 								query.put("pushid", pushid);
 								data = new BasicDBObject();
-								data.put("$inc", new BasicDBObject("status",
-										change));
+								data.put("$inc", new BasicDBObject("status", change));
 
 								this.save("pushidstatus", query, data);
+								if (type.equals("cost")) {
+									// uid = "15"; pid = "48";
+									System.out.println("cost found");
+									CutDown(uid, charge);
+									float TodayGroupCost = getDayCost(pid);
+									float budget = 0.0f;
+									Class.forName(this.driver);
+									Connection conn = DriverManager
+											.getConnection(this.url, this.user,
+													this.password);
+									Statement statement = conn
+											.createStatement();
+									String sql = "select budget from adp_plan_info where plan_id="
+											+ pid;
+									ResultSet rs = statement.executeQuery(sql);
+									while (rs.next())
+										budget = rs.getFloat("budget");
+									float account = 0.0f;
+									sql = "select account from adp_user_info where uid="
+											+ uid;
+									rs = statement.executeQuery(sql);
+									while (rs.next())
+										account = rs.getFloat("account");
+									rs.close();
+									System.out.println("charge="
+											+ String.valueOf(charge) + ",uid="
+											+ String.valueOf(uid) + ",pid="
+											+ String.valueOf(pid) + ",Budget="
+											+ String.valueOf(budget)
+											+ ",TodayPlanCost="
+											+ String.valueOf(TodayGroupCost)
+											+ ",account="
+											+ String.valueOf(account));
+									if (TodayGroupCost >= budget) {
+										StopAPlan(pid);
+									}
+									if (account <= 0) {
+										StopAllPlan(uid);
+									}
+									statement.close();
+									conn.close();
+								}
 
 							} else {
-								// System.out.println("unknown type");
+								System.out.println("unknown type");
 							}
 						} else {
-							// System.out.print(Arrays.toString(segments));
-							// System.out.println("bad record.");
+							System.out.print(Arrays.toString(segments));
+							System.out.println("bad record.");
 						}
 					}
 					System.out.println("OK");
