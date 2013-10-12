@@ -262,17 +262,13 @@ public class Task implements Runnable {
 		int a = 0;
 		if (cur.size() > 0) {
 			BasicDBObject d = (BasicDBObject) cur.get(0);
-			// System.out.println(d.toString());
-			// System.out.println(d.get("status"));
 			a = Integer.parseInt(d.getString("status"));
 		}
-		// System.out.println(cur.size());
 		if (cur.size() == 0 && type.equals("push"))
 			return true;
 		if (cur.size() != 1)
 			return false;
 		try {
-			// System.out.println(a);
 			if (type.equals("show") && a == 4)
 				return true;
 			else if (type.equals("click") && a == 6)
@@ -293,15 +289,11 @@ public class Task implements Runnable {
 			BasicDBObject d = (BasicDBObject) cur.get(0);
 			a = Integer.parseInt(d.getString("status"));
 		}
-		if (cur.size() == 0)
-			return true;
-		if (cur.size() != 1)
-			return false;
+		if (cur.size() == 0) return true;
+		if (cur.size() != 1) return false;
 		try {
-			if (a == 0)
-				return true;
-			else
-				return false;
+			if (a == 0) return true;
+			else return false;
 		} catch (Exception e) {
 			System.out.println(e.toString() + "isvalid is not work properly");
 			return false;
@@ -313,13 +305,11 @@ public class Task implements Runnable {
 		query.put("pushid", pushid);
 		BasicDBObject data = new BasicDBObject();
 		data.put("$inc", new BasicDBObject("status", 1));
-
 		return this.save("pushidcost", query, data);
 	}
 
 	private boolean save(String collection, DBObject query, DBObject data) {
-		return this.db.getCollection(collection)
-				.update(query, data, true, false).getN() == 1;
+		return this.db.getCollection(collection).update(query, data, true, false).getN() == 1;
 	}
 
 	public float getDayCost(String pid) {
@@ -332,8 +322,7 @@ public class Task implements Runnable {
 		}
 		if (mongo != null) {
 			String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
-			DBCollection col = mongo.getDB(this.database).getCollection(
-					"DayDetail");
+			DBCollection col = mongo.getDB(this.database).getCollection("DayDetail");
 			DBObject query = new BasicDBObject();
 			query.put("pid", pid);
 			query.put("time", today);
@@ -344,17 +333,10 @@ public class Task implements Runnable {
 			DBObject initial = new BasicDBObject();
 			initial.put("cost", 0);
 			String reduce = "function(curr,result){if(curr.cost!=null)result.cost+=curr.cost;}";
-			List<Object> returnList = (BasicDBList) col.group(key, cond,
-					initial, reduce);
-			// System.out.println(key);
-			// System.out.println(cond);
-			// System.out.println(initial);
-			// System.out.println(reduce);
+			List<Object> returnList = (BasicDBList) col.group(key, cond, initial, reduce);
 			for (int i = 0; i < returnList.size(); i++) {
 				try {
-					System.out.println("A");
-					ret += Float.valueOf(((DBObject) returnList.get(i)).get(
-							"cost").toString());
+					ret += Float.valueOf(((DBObject) returnList.get(i)).get("cost").toString());
 				} catch (java.lang.NullPointerException e) {
 					e.printStackTrace();
 				}
@@ -370,17 +352,14 @@ public class Task implements Runnable {
 			Class.forName(this.driver);
 			Connection conn = null;
 			try {
-				conn = DriverManager.getConnection(this.url, this.user,
-						this.password);
+				conn = DriverManager.getConnection(this.url, this.user, this.password);
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
 			Statement statement;
 			try {
 				statement = conn.createStatement();
-				String sql = "update adp_plan_info set enable=5 where plan_id="
-						+ pid;
-				statement.executeUpdate(sql);
+				statement.executeUpdate("update adp_plan_info set enable=2 where plan_id=" + pid);
 				conn.close();
 			} catch (SQLException e) {
 				e.printStackTrace();
@@ -396,8 +375,7 @@ public class Task implements Runnable {
 			Class.forName(this.driver);
 			Connection conn = null;
 			try {
-				conn = DriverManager.getConnection(this.url, this.user,
-						this.password);
+				conn = DriverManager.getConnection(this.url, this.user, this.password);
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
@@ -409,8 +387,7 @@ public class Task implements Runnable {
 				ResultSet rs = statement.executeQuery(sql);
 				while (rs.next()) Pids.add(rs.getString("plan_id"));
 				for (String pid : Pids) {
-					sql = "update adp_plan_info set enable=5 where plan_id="+ pid;
-					statement.executeUpdate(sql);
+					statement.executeUpdate("update adp_plan_info set enable=2 where plan_id="+ pid);
 				}
 				statement.close();
 				conn.close();
@@ -428,16 +405,14 @@ public class Task implements Runnable {
 			Class.forName(this.driver);
 			Connection conn = null;
 			try {
-				conn = DriverManager.getConnection(this.url, this.user,
-						this.password);
+				conn = DriverManager.getConnection(this.url, this.user, this.password);
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
 			Statement statement;
 			try {
 				statement = conn.createStatement();
-				String sql = "update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid;
-				statement.executeUpdate(sql);
+				statement.executeUpdate("update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid);
 				statement.close();
 				conn.close();
 			} catch (SQLException e) {
@@ -464,7 +439,6 @@ public class Task implements Runnable {
 			String InputPath = this.prefix + RunAt + this.suffix;
 			System.out.println("<begin>");
 			System.out.println("Input: " + InputPath);
-			// System.out.println("RunAt: " + RunAt);
 			String line = null;
 			File f = new File(InputPath);
 			if (f.exists()) {
@@ -488,8 +462,7 @@ public class Task implements Runnable {
 							String pushid = null;
 							boolean T = false;
 							int change = 0;
-							if (type.equals("rtb_creative")
-									&& version.equals("1")) {
+							if (type.equals("rtb_creative") && version.equals("1")) {
 								date = getdate(segments[this.push_date]);
 								try {
 									area = getarea(segments[this.push_area]);
@@ -546,12 +519,7 @@ public class Task implements Runnable {
 								change = 1;
 							}
 							if (T && isvalid(type, pushid)) {
-								// System.out.println("Get:" + type + "_" +
-								// version);
-								System.out.println("Type:<" + type + "> Date:<"
-										+ date + "> Area:<" + area
-										+ "> Source:<" + source + "> ID:<" + id
-										+ ">");
+								System.out.println("Type:<" + type + "> Date:<"+ date + "> Area:<" + area+ "> Source:<" + source + "> ID:<" + id+ ">");
 								DBObject query = new BasicDBObject();
 								String info[] = this.getinfo(id);
 								String uid = info[0];
@@ -573,51 +541,37 @@ public class Task implements Runnable {
 										type = "cost";
 									} catch (Exception e) {
 									}
-								} else
+								} else {
 									charge = 1;
-								data.put("$inc",
-										new BasicDBObject(type, charge));
+								}
+								data.put("$inc", new BasicDBObject(type, charge));
 								this.save("DayDetail", query, data);
 
 								query = new BasicDBObject();
 								query.put("pushid", pushid);
 								data = new BasicDBObject();
-								data.put("$inc", new BasicDBObject("status", change));
-
-								this.save("pushidstatus", query, data);
+								if(!type.equals("cost")) {
+									data.put("$inc", new BasicDBObject("status", change));
+									System.out.println("data:"+data);
+									this.save("pushidstatus", query, data);
+								}
 								if (type.equals("cost")) {
-									// uid = "15"; pid = "48";
 									System.out.println("cost found");
 									CutDown(uid, charge);
 									float TodayGroupCost = getDayCost(pid);
 									float budget = 0.0f;
 									Class.forName(this.driver);
-									Connection conn = DriverManager
-											.getConnection(this.url, this.user,
-													this.password);
-									Statement statement = conn
-											.createStatement();
-									String sql = "select budget from adp_plan_info where plan_id="
-											+ pid;
+									Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
+									Statement statement = conn.createStatement();
+									String sql = "select budget from adp_plan_info where plan_id="+ pid;
 									ResultSet rs = statement.executeQuery(sql);
-									while (rs.next())
-										budget = rs.getFloat("budget");
+									while (rs.next())budget = rs.getFloat("budget");
 									float account = 0.0f;
-									sql = "select account from adp_user_info where uid="
-											+ uid;
+									sql = "select account from adp_user_info where uid="+ uid;
 									rs = statement.executeQuery(sql);
-									while (rs.next())
-										account = rs.getFloat("account");
+									while (rs.next())account = rs.getFloat("account");
 									rs.close();
-									System.out.println("charge="
-											+ String.valueOf(charge) + ",uid="
-											+ String.valueOf(uid) + ",pid="
-											+ String.valueOf(pid) + ",Budget="
-											+ String.valueOf(budget)
-											+ ",TodayPlanCost="
-											+ String.valueOf(TodayGroupCost)
-											+ ",account="
-											+ String.valueOf(account));
+									System.out.println("charge="+ String.valueOf(charge) + ",uid="+ String.valueOf(uid) + ",pid="+ String.valueOf(pid) + ",Budget="+ String.valueOf(budget)+ ",TodayPlanCost="+ String.valueOf(TodayGroupCost)+ ",account="+ String.valueOf(account));
 									if (TodayGroupCost >= budget) {
 										StopAPlan(pid);
 									}
