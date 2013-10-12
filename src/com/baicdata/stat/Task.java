@@ -192,8 +192,7 @@ public class Task implements Runnable {
 			Class.forName(this.driver);
 			try {
 				// System.out.println(this.url+"+"+this.user+"+"+this.password);
-				Connection conn = DriverManager.getConnection(this.url,
-						this.user, this.password);
+				Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
 				Statement statement = conn.createStatement();
 				String sql = "select * from adp_ad_info where adid=" + adid;
 
@@ -205,16 +204,12 @@ public class Task implements Runnable {
 					uid = rs.getString("uid");
 					pid = rs.getString("plan_id");
 					gid = rs.getString("group_id");
-					// System.out.println(uid + "," + pid + "," + gid);
 				}
 				rs.close();
 				conn.close();
-				if (uid != null)
-					this.u.put(adid, uid);
-				if (pid != null)
-					this.p.put(adid, pid);
-				if (gid != null)
-					this.g.put(adid, gid);
+				if (uid != null) this.u.put(adid, uid);
+				if (pid != null) this.p.put(adid, pid);
+				if (gid != null) this.g.put(adid, gid);
 				String[] ret = { uid, pid, gid };
 				return ret;
 			} catch (SQLException e) {
@@ -237,44 +232,32 @@ public class Task implements Runnable {
 	public String getid(String id) {
 		int i = 0;
 		String a = "";
-		for (i = 0; i < id.length() && id.charAt(i) == '0'; i++)
-			;
-		if (i == id.length())
-			a = "0";
-		else
-			a = id.substring(i);
+		for (i = 0; i < id.length() && id.charAt(i) == '0'; i++);
+		if (i == id.length()) a = "0";
+		else a = id.substring(i);
 		String ret = "";
 		for (i = 0; i < a.length(); i++) {
-			if (a.charAt(i) <= '9' && a.charAt(i) >= '0')
-				ret += a.charAt(i);
+			if (a.charAt(i) <= '9' && a.charAt(i) >= '0') ret += a.charAt(i);
 		}
-		if (ret.equals(""))
-			ret = "0";
-		// System.out.println("return adid:" + ret);
+		if (ret.equals("")) ret = "0";
 		return ret;
 	}
 
 	public boolean isvalid(String type, String pushid) {
 		if (type.equals("bidres"))
 			return isvalidcost(pushid);
-		List<DBObject> cur = this.db.getCollection("pushidstatus")
-				.find(new BasicDBObject("pushid", pushid)).toArray();
+		List<DBObject> cur = this.db.getCollection("pushidstatus").find(new BasicDBObject("pushid", pushid)).toArray();
 		int a = 0;
 		if (cur.size() > 0) {
 			BasicDBObject d = (BasicDBObject) cur.get(0);
 			a = Integer.parseInt(d.getString("status"));
 		}
-		if (cur.size() == 0 && type.equals("push"))
-			return true;
-		if (cur.size() != 1)
-			return false;
+		if (cur.size() == 0 && type.equals("push")) return true;
+		if (cur.size() != 1) return false;
 		try {
-			if (type.equals("show") && a == 4)
-				return true;
-			else if (type.equals("click") && a == 6)
-				return true;
-			else
-				return false;
+			if (type.equals("show") && a == 4) return true;
+			else if (type.equals("click") && a == 6) return true;
+			else return false;
 		} catch (Exception e) {
 			System.out.println(e.toString() + "isvalid is not work properly");
 			return false;
@@ -282,8 +265,7 @@ public class Task implements Runnable {
 	}
 
 	public boolean isvalidcost(String pushid) {
-		List<DBObject> cur = this.db.getCollection("pushidcost")
-				.find(new BasicDBObject("pushid", pushid)).toArray();
+		List<DBObject> cur = this.db.getCollection("pushidcost").find(new BasicDBObject("pushid", pushid)).toArray();
 		int a = 0;
 		if (cur.size() > 0) {
 			BasicDBObject d = (BasicDBObject) cur.get(0);
@@ -347,6 +329,7 @@ public class Task implements Runnable {
 	}
 
 	private void StopAPlan(String pid) {
+		// Stop this plan and groups within this plan
 		System.out.println("Stop a Plan");
 		try {
 			Class.forName(this.driver);
@@ -360,6 +343,15 @@ public class Task implements Runnable {
 			try {
 				statement = conn.createStatement();
 				statement.executeUpdate("update adp_plan_info set enable=2 where plan_id=" + pid);
+				//
+				ArrayList<String> Pids = new ArrayList<String>();
+				String sql = "select group_id from adp_group_info where plan_id=" + pid;
+				ResultSet rs = statement.executeQuery(sql);
+				while (rs.next()) Pids.add(rs.getString("group_id"));
+				for (String p : Pids) {
+					statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
+				}
+				//
 				conn.close();
 			} catch (SQLException e) {
 				e.printStackTrace();
@@ -388,6 +380,17 @@ public class Task implements Runnable {
 				while (rs.next()) Pids.add(rs.getString("plan_id"));
 				for (String pid : Pids) {
 					statement.executeUpdate("update adp_plan_info set enable=2 where plan_id="+ pid);
+					
+					//
+					ArrayList<String> Pids2 = new ArrayList<String>();
+					sql = "select group_id from adp_group_info where plan_id=" + pid;
+					rs = statement.executeQuery(sql);
+					while (rs.next()) Pids2.add(rs.getString("group_id"));
+					for (String p : Pids2) {
+						statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
+					}
+					//
+					
 				}
 				statement.close();
 				conn.close();
@@ -552,11 +555,11 @@ public class Task implements Runnable {
 								data = new BasicDBObject();
 								if(!type.equals("cost")) {
 									data.put("$inc", new BasicDBObject("status", change));
-									System.out.println("data:"+data);
+//									System.out.println("data:"+data);
 									this.save("pushidstatus", query, data);
 								}
 								if (type.equals("cost")) {
-									System.out.println("cost found");
+//									System.out.println("cost found");
 									CutDown(uid, charge);
 									float TodayGroupCost = getDayCost(pid);
 									float budget = 0.0f;
