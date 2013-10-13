@@ -566,9 +566,9 @@ public class Task implements Runnable {
 									Class.forName(this.driver);
 									Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
 									Statement statement = conn.createStatement();
-									String sql = "select daily_consum from adp_plan_info where plan_id="+ pid;
+									String sql = "select budget from adp_plan_info where plan_id="+ pid;
 									ResultSet rs = statement.executeQuery(sql);
-									while (rs.next())budget = rs.getFloat("daily_consum");
+									while (rs.next())budget = rs.getFloat("budget");
 									float account = 0.0f;
 									sql = "select account from adp_user_info where uid="+ uid;
 									rs = statement.executeQuery(sql);
