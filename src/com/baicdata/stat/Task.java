@@ -300,6 +300,7 @@ public class Task implements Runnable {
 		try {
 			mongo = new Mongo(this.host, this.port);
 		} catch (UnknownHostException e) {
+			e.printStackTrace();
 			return ret;
 		}
 		if (mongo != null) {
@@ -343,13 +344,14 @@ public class Task implements Runnable {
 			try {
 				statement = conn.createStatement();
 				statement.executeUpdate("update adp_plan_info set enable=2 where plan_id=" + pid);
-				//
+				System.out.println("stop plan:"+pid);
 				ArrayList<String> Pids = new ArrayList<String>();
 				String sql = "select group_id from adp_group_info where plan_id=" + pid;
 				ResultSet rs = statement.executeQuery(sql);
 				while (rs.next()) Pids.add(rs.getString("group_id"));
 				for (String p : Pids) {
 					statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
+					System.out.println("stop group:"+p);
 				}
 				//
 				conn.close();
@@ -380,7 +382,7 @@ public class Task implements Runnable {
 				while (rs.next()) Pids.add(rs.getString("plan_id"));
 				for (String pid : Pids) {
 					statement.executeUpdate("update adp_plan_info set enable=2 where plan_id="+ pid);
-					
+					System.out.println("stop plan:"+pid);
 					//
 					ArrayList<String> Pids2 = new ArrayList<String>();
 					sql = "select group_id from adp_group_info where plan_id=" + pid;
@@ -388,6 +390,7 @@ public class Task implements Runnable {
 					while (rs.next()) Pids2.add(rs.getString("group_id"));
 					for (String p : Pids2) {
 						statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
+						System.out.println("stop group:"+p);
 					}
 					//
 					
@@ -540,12 +543,14 @@ public class Task implements Runnable {
 								if (type.equals("bidres")) {
 									try {
 										charge = Float.parseFloat(segments[this.res_cost]);
-										changestat(pushid);
-										type = "cost";
+										if(charge>0){
+											changestat(pushid);
+											type = "cost";
+										}
 									} catch (Exception e) {
 									}
 								} else {
-									charge = 1;
+									charge = 0;
 								}
 								data.put("$inc", new BasicDBObject(type, charge));
 								this.save("DayDetail", query, data);
