@@ -16,7 +16,10 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
 
+import com.adp.java.AdPlan;
 import com.adp.java.FlowSrc;
+import com.adp.java.PlanStatus;
+import com.adp.java.ReportFormService;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
@@ -24,6 +27,13 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBObject;
 import com.mongodb.Mongo;
 import java.sql.*;
+
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TTransportException;
 
 public class Task implements Runnable {
 	private SimpleDateFormat formater = null;
@@ -330,79 +340,67 @@ public class Task implements Runnable {
 	}
 
 	private void StopAPlan(String pid) {
-		// Stop this plan and groups within this plan
-		System.out.println("Stop a Plan");
+		TTransport transport = null;
+		transport = new TSocket("112.124.46.78", 9098);
+		TProtocol protocol = new TBinaryProtocol(transport);
+		ReportFormService.Client client = new ReportFormService.Client(protocol);
 		try {
-			Class.forName(this.driver);
-			Connection conn = null;
-			try {
-				conn = DriverManager.getConnection(this.url, this.user, this.password);
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
-			Statement statement;
-			try {
-				statement = conn.createStatement();
-				statement.executeUpdate("update adp_plan_info set enable=2 where plan_id=" + pid);
-				System.out.println("stop plan:"+pid);
-				ArrayList<String> Pids = new ArrayList<String>();
-				String sql = "select group_id from adp_group_info where plan_id=" + pid;
-				ResultSet rs = statement.executeQuery(sql);
-				while (rs.next()) Pids.add(rs.getString("group_id"));
-				for (String p : Pids) {
-					statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
-					System.out.println("stop group:"+p);
-				}
-				//
-				conn.close();
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
+			transport.open();
+		} catch (TTransportException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
+		try {
+			client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED);
+			System.out.println("stop plan:"+pid);
+		} catch (NumberFormatException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (TException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		transport.close();	
 	}
 
 	private void StopAllPlan(String uid) {
-		System.out.println("Stop All Plan");
+		TTransport transport = null;
+		transport = new TSocket("112.124.46.78", 9098);
+		TProtocol protocol = new TBinaryProtocol(transport);
+		ReportFormService.Client client = new ReportFormService.Client(protocol);
 		try {
-			Class.forName(this.driver);
-			Connection conn = null;
-			try {
-				conn = DriverManager.getConnection(this.url, this.user, this.password);
-			} catch (SQLException e) {
-				e.printStackTrace();
+			transport.open();
+		} catch (TTransportException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		ArrayList<String> pids = new ArrayList<String>();
+		try {
+			List<AdPlan> a = client.getAdPlansByUid(Integer.parseInt(uid));
+			for(AdPlan ap : a) {
+				pids.add(String.valueOf(ap.plan_id));
 			}
-			Statement statement;
-			try {
-				statement = conn.createStatement();
-				ArrayList<String> Pids = new ArrayList<String>();
-				String sql = "select plan_id from adp_plan_info where uid=" + uid;
-				ResultSet rs = statement.executeQuery(sql);
-				while (rs.next()) Pids.add(rs.getString("plan_id"));
-				for (String pid : Pids) {
-					statement.executeUpdate("update adp_plan_info set enable=2 where plan_id="+ pid);
-					System.out.println("stop plan:"+pid);
-					//
-					ArrayList<String> Pids2 = new ArrayList<String>();
-					sql = "select group_id from adp_group_info where plan_id=" + pid;
-					rs = statement.executeQuery(sql);
-					while (rs.next()) Pids2.add(rs.getString("group_id"));
-					for (String p : Pids2) {
-						statement.executeUpdate("update adp_group_info set enable=2 where group_id="+ p);
-						System.out.println("stop group:"+p);
-					}
-					//
-					
-				}
-				statement.close();
-				conn.close();
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
-		} catch (ClassNotFoundException e) {
+		} catch (NumberFormatException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (TException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		for (String pid:pids) {
+			try {
+				client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED);
+				System.out.println("frozen plan:"+pid);
+			} catch (NumberFormatException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			} catch (TException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		}
+		transport.close();	
+		
 	}
 
 	private void CutDown(String uid, float charge) {
