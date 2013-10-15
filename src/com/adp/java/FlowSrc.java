@@ -32,7 +32,7 @@ public enum FlowSrc implements org.apache.thrift.TEnum {
   public int getValue() {
     return value;
   }
-
+ 
   /**
    * Find a the enum type by its integer value, as defined in the Thrift IDL.
    * @return null if the value is not found.
