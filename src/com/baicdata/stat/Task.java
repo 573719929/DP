@@ -351,8 +351,7 @@ public class Task implements Runnable {
 			e1.printStackTrace();
 		}
 		try {
-			client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED);
-			System.out.println("stop plan:"+pid);
+			System.out.println("stop plan:"+pid+"("+client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED)+")");
 		} catch (NumberFormatException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -389,8 +388,7 @@ public class Task implements Runnable {
 		}
 		for (String pid:pids) {
 			try {
-				client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED);
-				System.out.println("frozen plan:"+pid);
+				System.out.println("frozen plan:"+pid+"("+client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED)+")");
 			} catch (NumberFormatException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
@@ -416,7 +414,11 @@ public class Task implements Runnable {
 			Statement statement;
 			try {
 				statement = conn.createStatement();
-				statement.executeUpdate("update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid);
+				System.out.println(charge);
+				//statement.executeUpdate("update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid);
+				System.out.println("update adp_user_info set account=account-" + String.format("%s", charge*1000) + "/1000 where uid=" + uid);
+				statement.executeUpdate("update adp_user_info set account=account-" + String.format("%s", charge*1000) + "/1000 where uid=" + uid);
+				
 				statement.close();
 				conn.close();
 			} catch (SQLException e) {
@@ -540,8 +542,8 @@ public class Task implements Runnable {
 								float charge = 0.0f;
 								if (type.equals("bidres")) {
 									try {
-										charge = Float.parseFloat(segments[this.res_cost]);
-										if(charge>0){
+										charge = Float.parseFloat(segments[this.res_cost])/1000;
+										if(charge>0 && charge<100){
 											changestat(pushid);
 											type = "cost";
 										}

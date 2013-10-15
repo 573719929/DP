@@ -10,6 +10,8 @@ package com.baicdata.stat;
  * { "_id" : "adid:101|uid:10|group_id:76|plan_id:20|time:2013-12-28|area:33009999|source:7", "uid" : 10, "show" : 384, "adid" : 101, "click" : 38, "area" : "33009999", "planid" : 20, "source" : "7", "time" : "2013-12-28", "push" : 480, "groupid" : 76 }
  */
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.UnknownHostException;
@@ -39,8 +41,13 @@ public class Worker implements ReportService.Iface {
 	private Mongo mongo = null;
 
 	public Worker(String config) {
-		InputStream inputStream = this.getClass().getClassLoader()
-				.getResourceAsStream(config);
+		InputStream inputStream = null;
+		try {
+			inputStream = new FileInputStream(config);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		Properties p = new Properties();
 		try {
 			p.load(inputStream);
@@ -73,27 +80,29 @@ public class Worker implements ReportService.Iface {
 		r.setTotalSize(0);
 		r.setPageNumber(0);
 		r.setData(new ArrayList<Response>());
-
+		
 		try {
 			this.mongo = new Mongo(this.host, this.port);
 		} catch (UnknownHostException e) {
 			return r;
 		}
+		
 		int total = 0;
 		if (this.mongo != null) {
-			DBCollection col = this.mongo.getDB(this.database).getCollection(
-					"DayDetail");
+			DBCollection col = this.mongo.getDB(this.database).getCollection("DayDetail");
 			DBObject query = new BasicDBObject();
 			query.put(input, q.id);
 			DBObject datetime = new BasicDBObject();
-			datetime.put("$gt", q.startAt);
-			datetime.put("$lt", q.endAt);
+			datetime.put("$gte", q.startAt);
+			datetime.put("$lte", q.endAt);
 			query.put("time", datetime);
+			
 			DBObject area = new BasicDBObject();
 			if (q.areaid != null && !q.areaid.isEmpty()) {
 				area.put("$in", q.areaid);
 				query.put("area", area);
 			}
+			
 			String source = null;
 			if (q.source == FlowSrc.self_media) {
 				source = "self_media";
@@ -108,38 +117,52 @@ public class Worker implements ReportService.Iface {
 			} else if (q.source == FlowSrc.youku) {
 				source = "youku";
 			}
+			
 			if (source != null)
 				query.put("source", source);
 
 			DBObject key = new BasicDBObject();
-			key.put(output, q.id);
-
+			//key.put(output, q.id);
+			key.put(output, true);
+			
 			DBObject cond = new BasicDBObject();
 			cond = query;
 			DBObject initial = new BasicDBObject();
+			
 			initial.put("push", 0);
 			initial.put("show", 0);
 			initial.put("click", 0);
 			initial.put("cost", 0);
-
-			String reduce = "function(curr,result){if(curr.push!=null)result.push+=curr.push;if(curr.show!=null)result.show+=curr.show;if(curr.click!=null)result.click+=curr.click;if(curr.cost!=null)result.cost+=curr.cost;}";
-
-			List<Object> returnList = (BasicDBList) col.group(key, cond,
-					initial, reduce);
-
+			
+			
+			String reduce = "function(curr,result){if(curr.push!=null)result.push+=(+curr.push);if(curr.show!=null)result.show+=(+curr.show);if(curr.click!=null)result.click+=(+curr.click);if(curr.cost!=null)result.cost+=(+curr.cost);}";
+			
+			System.out.println(key);
+			System.out.println(cond);
+			System.out.println(initial);
+			System.out.println(reduce);
+			DBObject b = null;
+			try{
+				b = col.group(key, cond, initial, reduce);
+			}catch(Exception e) {e.printStackTrace();}
+			
+			
+			List<Object> returnList = (BasicDBList) b;
+			
 			total = returnList.size();
 			int fromIndex = p.pageSize * (p.pageNumber - 1);
+			
 			if (fromIndex < 0)
 				fromIndex = 0;
 			int toIndex = p.pageSize * (p.pageNumber);
 			if (toIndex > returnList.size())
 				toIndex = returnList.size();
-
+			
 			if (total > 0 && toIndex >= fromIndex) {
 
 				returnList = returnList.subList(fromIndex, toIndex);
 				DBObject t = null;
-
+				
 				for (int i = 0; i < returnList.size(); i++) {
 
 					t = (DBObject) returnList.get(i);
@@ -169,18 +192,25 @@ public class Worker implements ReportService.Iface {
 						cost = Float.valueOf(t.get("cost").toString());
 					} catch (java.lang.NullPointerException e) {
 					}
+					
 					r.data.add(new Response(id, push, show, click, cost));
 				}
 			}
 		}
+		
 		this.mongo.close();
 		r.setTotalSize(total);
 		r.setCurrentSize(r.getData().size());
-		if (p.getPageSize() != 0)
+		
+		if (p.getPageSize() != 0) {
+			
 			r.setTotalPage((int) (r.getTotalSize() * 1.0 / p.getPageSize()) + 1);
-		else
+		}
+		else {
 			r.setTotalPage(0);
+		}
 		r.setPageNumber(p.getPageNumber());
+		
 		this.mongo = null;
 		return r;
 	}
@@ -244,8 +274,7 @@ public class Worker implements ReportService.Iface {
 	@Override
 	public reportResult AdReportByAdid(queryOptions q, pageOptions p)
 			throws TException {
-		// TODO Auto-generated method stub
-		return null;
+		return parse(q, p, "adid", "adid");
 	}
 
 	@Override
@@ -346,6 +375,25 @@ public class Worker implements ReportService.Iface {
 			throws TException {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	@Override
+	public double getCostByUid(queryOptions q) throws TException {
+		double ret = 0.0d;
+		
+		pageOptions p = new pageOptions();
+		p.setPageNumber(1); p.setPageSize(1000);
+		reportResult r = parse(q, p, "uid", "pid");
+		if(r.data!=null){
+
+			for(Response r2:r.data)
+			{
+
+				ret += r2.cost;
+			}
+		}
+
+		return ret;
 	}
 
 }

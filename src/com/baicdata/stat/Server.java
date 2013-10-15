@@ -1,5 +1,7 @@
 package com.baicdata.stat;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -18,13 +20,19 @@ public class Server {
 	public void startServer(String config) {
 		try {
 			System.out.println("read config from: "+config);
-			InputStream inputStream = this.getClass().getClassLoader()
-					.getResourceAsStream(config);
+			
+			InputStream inputStream = null;
+			try {
+				inputStream = new FileInputStream(config);
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			Properties p = new Properties();
 			try {
 				p.load(inputStream);
-			} catch (IOException e1) {
-				e1.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 			TServerSocket serverTransport = new TServerSocket(
 					Integer.parseInt(p.getProperty("port")));

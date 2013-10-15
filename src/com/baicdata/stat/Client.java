@@ -18,39 +18,29 @@ import com.adp.java.FlowSrc;
 
 public class Client {
 
-	public void startClient(String config) {
+	public void startClient(String args[]) {
 		TTransport transport;
 		try {
-			System.out.println("read config from: " + config);
-			InputStream inputStream = this.getClass().getClassLoader()
-					.getResourceAsStream(config);
-			Properties p = new Properties();
-			try {
-				p.load(inputStream);
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-
-			transport = new TSocket("localhost", Integer.parseInt(p
-					.getProperty("port")));
+			
+			transport = new TSocket("localhost", 12545);
 			TProtocol protocol = new TBinaryProtocol(transport);
 			ReportService.Client client = new ReportService.Client(protocol);
 			transport.open();
 
-			String Uid = "1";
-			String Start = "20110101", End = "20900909";
+			String Uid = args[0];
+			String Start = args[1], End = args[2];
 			
-			queryOptions Q1 = new queryOptions();
-			Q1.setId(Uid);
-			Q1.setStartAt(Start);
-			Q1.setEndAt(End);
-			pageOptions P1 = new pageOptions();
-			P1.setPageNumber(1);
-			
-			System.out.println(Q1);
-			System.out.println(P1);
+			queryOptions Q = new queryOptions();
+			Q.setId(Uid);
+			Q.setStartAt(Start);
+			Q.setEndAt(End);
+			pageOptions P = new pageOptions();
+			P.setPageNumber(1); P.setPageSize(1000);
+			System.out.println(Q);
+			System.out.println(P);
+
 			try {
-				System.out.println(client.PlanReportByUid(Q1, P1));
+				System.out.println(client.AdReportByAdid(Q, P));
 			} catch (TApplicationException e) {
 				e.printStackTrace();
 			}
@@ -66,7 +56,7 @@ public class Client {
 
 	public static void main(String[] args) {
 		Client client = new Client();
-		client.startClient(args[0]);
+		client.startClient(args);
 
 	}
 }
