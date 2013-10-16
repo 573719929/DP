@@ -45,7 +45,7 @@ public class Worker implements ReportService.Iface {
 		try {
 			inputStream = new FileInputStream(config);
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
+
 			e.printStackTrace();
 		}
 		Properties p = new Properties();
