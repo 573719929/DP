@@ -75,6 +75,7 @@ public class Task implements Runnable {
 	private int res_adid = 0;
 	private int res_pushid = 0;
 	private int res_cost = 0;
+	private Connection conn = null;
 
 	public Task(String h, int p, String d, String pf, String sf, String url,
 			String user, String password, String pat, String sep,
@@ -84,7 +85,11 @@ public class Task implements Runnable {
 			int click_source, int click_adid, int click_pushid, int res_date,
 			int res_area, int res_source, int res_adid, int res_pushid,
 			int res_cost, String url2, String user2, String password2) {
-
+		try {
+			Class.forName(this.driver);
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
 		this.formater = new SimpleDateFormat(pat);
 		this.host = h;
 		this.port = p;
@@ -127,6 +132,12 @@ public class Task implements Runnable {
 		this.res_pushid = res_pushid;
 
 		this.res_cost = res_cost;
+		this.conn = null;
+		try {
+			this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public static void main(String[] args) {
@@ -199,10 +210,12 @@ public class Task implements Runnable {
 			return ret;
 		}
 		try {
-			Class.forName(this.driver);
-			try {
+			//Class.forName(this.driver);
+			//try {
 				// System.out.println(this.url+"+"+this.user+"+"+this.password);
-				Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
+				if (this.conn == null) {
+					this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+				}
 				Statement statement = conn.createStatement();
 				String sql = "select * from adp_ad_info where adid=" + adid;
 
@@ -216,7 +229,7 @@ public class Task implements Runnable {
 					gid = rs.getString("group_id");
 				}
 				rs.close();
-				conn.close();
+//				conn.close();
 				if (uid != null) this.u.put(adid, uid);
 				if (pid != null) this.p.put(adid, pid);
 				if (gid != null) this.g.put(adid, gid);
@@ -225,9 +238,9 @@ public class Task implements Runnable {
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		}
+		//} catch (ClassNotFoundException e) {
+		//	e.printStackTrace();
+		//}
 		return null;
 	}
 
@@ -396,16 +409,18 @@ public class Task implements Runnable {
 	}
 
 	private void CutDown(String uid, float charge) {
-		System.out.println("Cut Down");
-		try {
-			Class.forName(this.driver);
-			Connection conn = null;
-			try {
-				conn = DriverManager.getConnection(this.url, this.user, this.password);
-			} catch (SQLException e) {
-				e.printStackTrace();
+//		System.out.println("Cut Down");
+		//try {
+			//Class.forName(this.driver);
+			//Connection conn = null;
+			if (this.conn == null) {
+				try {
+					this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
 			}
-			Statement statement;
+			Statement statement = null;
 			try {
 				statement = conn.createStatement();
 				System.out.println(charge);
@@ -414,13 +429,13 @@ public class Task implements Runnable {
 				statement.executeUpdate("update adp_user_info set account=account-" + String.format("%s", charge*1000) + "/1000 where uid=" + uid);
 				
 				statement.close();
-				conn.close();
+//				conn.close();
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		}
+		//} catch (ClassNotFoundException e) {
+		//	e.printStackTrace();
+		//}
 	}
 
 	@Override
@@ -562,8 +577,10 @@ public class Task implements Runnable {
 									CutDown(uid, charge);
 									float TodayGroupCost = getDayCost(pid);
 									float budget = 0.0f;
-									Class.forName(this.driver);
-									Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
+									//Class.forName(this.driver);
+									if(this.conn==null) {
+										this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+									}
 									Statement statement = conn.createStatement();
 									String sql = "select budget from adp_plan_info where plan_id="+ pid;
 									ResultSet rs = statement.executeQuery(sql);
@@ -581,7 +598,7 @@ public class Task implements Runnable {
 										StopAllPlan(uid);
 									}
 									statement.close();
-									conn.close();
+//									conn.close();
 								}
 
 							} else {
