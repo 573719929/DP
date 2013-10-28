@@ -231,13 +231,6 @@ public class Task implements Runnable {
 		return null;
 	}
 
-	public String getarea(String areaid) {
-		return areaid;
-	}
-
-	public String getsource(String source) {
-		return source;
-	}
 
 	public String getid(String id) {
 		int i = 0;
@@ -297,6 +290,7 @@ public class Task implements Runnable {
 		query.put("pushid", pushid);
 		BasicDBObject data = new BasicDBObject();
 		data.put("$inc", new BasicDBObject("status", 1));
+		data.put("$set", new BasicDBObject("timestamp", System.currentTimeMillis()));
 		return this.save("pushidcost", query, data);
 	}
 
@@ -471,11 +465,11 @@ public class Task implements Runnable {
 							if (type.equals("rtb_creative") && version.equals("1")) {
 								date = getdate(segments[this.push_date]);
 								try {
-									area = getarea(segments[this.push_area]);
+									area = segments[this.push_area];
 								} catch (Exception e) {
 									area = "-1";
 								}
-								source = getsource(segments[this.push_source]);
+								source = segments[this.push_source];
 								id = getid(segments[this.push_adid]);
 								pushid = segments[this.push_pushid];
 								T = true;
@@ -485,11 +479,11 @@ public class Task implements Runnable {
 									&& version.equals("1")) {
 								date = getdate(segments[this.show_date]);
 								try {
-									area = getarea(segments[this.show_area]);
+									area = segments[this.show_area];
 								} catch (Exception e) {
 									area = "-1";
 								}
-								source = getsource(segments[this.show_source]);
+								source = segments[this.show_source];
 								id = getid(segments[this.show_adid]);
 								pushid = segments[this.show_pushid];
 								T = true;
@@ -499,11 +493,11 @@ public class Task implements Runnable {
 									&& version.equals("1")) {
 								date = getdate(segments[this.res_date]);
 								try {
-									area = getarea(segments[this.res_area]);
+									area = segments[this.res_area];
 								} catch (Exception e) {
 									area = "-1";
 								}
-								source = getsource(segments[this.res_source]);
+								source = segments[this.res_source];
 								id = getid(segments[this.res_adid]);
 								pushid = segments[this.res_pushid];
 								T = true;
@@ -513,11 +507,11 @@ public class Task implements Runnable {
 									&& version.equals("1")) {
 								date = getdate(segments[this.click_date]);
 								try {
-									area = getarea(segments[this.click_area]);
+									area = segments[this.click_area];
 								} catch (Exception e) {
 									area = "-1";
 								}
-								source = getsource(segments[this.click_source]);
+								source = segments[this.click_source];
 								id = getid(segments[this.click_adid]);
 								pushid = segments[this.click_pushid];
 								T = true;
@@ -525,7 +519,7 @@ public class Task implements Runnable {
 								change = 1;
 							}
 							if (T && isvalid(type, pushid)) {
-								System.out.println("Type:<" + type + "> Date:<"+ date + "> Area:<" + area+ "> Source:<" + source + "> ID:<" + id+ ">");
+//								System.out.println("Type:<" + type + "> Date:<"+ date + "> Area:<" + area+ "> Source:<" + source + "> ID:<" + id+ ">");
 								DBObject query = new BasicDBObject();
 								String info[] = this.getinfo(id);
 								String uid = info[0];
@@ -543,14 +537,14 @@ public class Task implements Runnable {
 								if (type.equals("bidres")) {
 									try {
 										charge = Float.parseFloat(segments[this.res_cost])/1000;
-										if(charge>0 && charge<100){
+										if(charge>0 && charge<0.01){
 											changestat(pushid);
 											type = "cost";
 										}
 									} catch (Exception e) {
 									}
 								} else {
-									charge = 0;
+									charge = 1;
 								}
 								data.put("$inc", new BasicDBObject(type, charge));
 								this.save("DayDetail", query, data);
@@ -560,7 +554,7 @@ public class Task implements Runnable {
 								data = new BasicDBObject();
 								if(!type.equals("cost")) {
 									data.put("$inc", new BasicDBObject("status", change));
-//									System.out.println("data:"+data);
+									data.put("$set", new BasicDBObject("timestamp", System.currentTimeMillis()));
 									this.save("pushidstatus", query, data);
 								}
 								if (type.equals("cost")) {
@@ -591,7 +585,7 @@ public class Task implements Runnable {
 								}
 
 							} else {
-								System.out.println("unknown type");
+//								System.out.println("unknown type");
 							}
 						} else {
 							System.out.print(Arrays.toString(segments));
