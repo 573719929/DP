@@ -12,6 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Properties;
@@ -36,6 +37,10 @@ import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
 public class Task implements Runnable {
+	private HashMap<String, Double> CostCache;
+	private HashMap<String, Integer> CostStatusCache;
+	private HashMap<String, Integer> PSCStatusCache;
+	private HashMap<String, Double> AccountCache;
 	private SimpleDateFormat formater = null;
 	private String host = null;
 	private int port = 0;
@@ -76,6 +81,7 @@ public class Task implements Runnable {
 	private int res_pushid = 0;
 	private int res_cost = 0;
 	private Connection conn = null;
+	private HashMap<String, Double> BudgetCache;
 
 	public Task(String h, int p, String d, String pf, String sf, String url,
 			String user, String password, String pat, String sep,
@@ -90,6 +96,11 @@ public class Task implements Runnable {
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		}
+		this.CostCache = new HashMap<String, Double>();
+		this.CostStatusCache = new HashMap<String, Integer>();
+		this.PSCStatusCache = new HashMap<String, Integer>();
+		this.AccountCache = new HashMap<String, Double>();
+		this.BudgetCache = new HashMap<String, Double>();
 		this.formater = new SimpleDateFormat(pat);
 		this.host = h;
 		this.port = p;
@@ -260,60 +271,114 @@ public class Task implements Runnable {
 	}
 
 	public boolean isvalid(String type, String pushid) {
-		if (type.equals("bidres"))
-			return isvalidcost(pushid);
-		List<DBObject> cur = this.db.getCollection("pushidstatus").find(new BasicDBObject("pushid", pushid)).toArray();
-		int a = 0;
-		if (cur.size() > 0) {
-			BasicDBObject d = (BasicDBObject) cur.get(0);
-			a = Integer.parseInt(d.getString("status"));
-		}
-		if (cur.size() == 0 && type.equals("push")) return true;
-		if (cur.size() != 1) return false;
-		try {
-			if (type.equals("show") && a == 4) return true;
-			else if (type.equals("click") && a == 6) return true;
+		if (type.equals("bidres")) return isvalidcost(pushid);
+		boolean b = this.PSCStatusCache.containsKey(pushid);
+		if (!b&&type.equals("push"))return true;
+		if (b) {
+			int a = this.PSCStatusCache.get(pushid);
+			if (a == 4 && type.equals("show")) return true;
+			else if (a == 6 && type.equals("click")) return true;
 			else return false;
-		} catch (Exception e) {
-			System.out.println(e.toString() + "isvalid is not work properly");
-			return false;
-		}
+		} else return false;
 	}
 
 	public boolean isvalidcost(String pushid) {
-		List<DBObject> cur = this.db.getCollection("pushidcost").find(new BasicDBObject("pushid", pushid)).toArray();
-		int a = 0;
-		if (cur.size() > 0) {
-			BasicDBObject d = (BasicDBObject) cur.get(0);
-			a = Integer.parseInt(d.getString("status"));
-		}
-		if (cur.size() == 0) return true;
-		if (cur.size() != 1) return false;
-		try {
-			if (a == 0) return true;
-			else return false;
-		} catch (Exception e) {
-			System.out.println(e.toString() + "isvalid is not work properly");
-			return false;
-		}
+		return !this.CostStatusCache.containsKey(pushid);
 	}
 
 	public boolean changestat(String pushid) {
-		BasicDBObject query = new BasicDBObject();
-		query.put("pushid", pushid);
-		BasicDBObject data = new BasicDBObject();
-		data.put("$inc", new BasicDBObject("status", 1));
-		data.put("$set", new BasicDBObject("timestamp", System.currentTimeMillis()));
-		return this.save("pushidcost", query, data);
+		this.CostStatusCache.put(pushid, 1);
+		return true;
 	}
 
 	private boolean save(String collection, DBObject query, DBObject data) {
 		return this.db.getCollection(collection).update(query, data, true, false).getN() == 1;
 	}
-
-	public float getDayCost(String pid) {
-		float ret = 0;
+	private double getBudget(String timestamp, String pid) {
+		String key = pid+"+"+timestamp;
+		if(this.BudgetCache.containsKey(key))return this.BudgetCache.get(key);
+		if(this.conn==null) {
+			try {
+				this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		Statement statement = null;
+		try {
+			statement = conn.createStatement();
+		} catch (SQLException e1) {
+			e1.printStackTrace();
+		}
+		String sql = "select budget from adp_plan_info where plan_id="+ pid;
+		ResultSet rs = null;
+		try {
+			rs = statement.executeQuery(sql);
+		} catch (SQLException e1) {
+			e1.printStackTrace();
+		}
+		double budget = 0;
+		try {
+			while (rs.next())
+				budget = rs.getFloat("budget");
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		try {
+			statement.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		this.BudgetCache.put(key, budget);
+		return budget;
+	}
+	private double getAccount(String timestamp, String uid) {
+		String key = uid+"+"+timestamp;
+		if(this.AccountCache.containsKey(key))return this.AccountCache.get(key);
+		String sql = "select account from adp_user_info where uid="+ uid;
+		if (this.conn==null)
+			try {
+				this.conn = DriverManager.getConnection(this.url, this.user, this.password);
+			} catch (SQLException e1) {
+				e1.printStackTrace();
+			}
+		Statement statement = null;
+		try {
+			statement = conn.createStatement();
+		} catch (SQLException e1) {
+			e1.printStackTrace();
+		}
+		ResultSet rs = null;
+		try {
+			rs = statement.executeQuery(sql);
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		double account = 0;
+		try {
+			while (rs.next())account  = rs.getFloat("account");
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		try {
+			rs.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		try {
+			statement.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		this.AccountCache.put(key, account);
+		return account;
+	}
+	public double getDayCost(String timestamp, String pid) {
+		double ret = 0;
 		Mongo mongo = null;
+		Date d = new Date();
+		String cachekey = String.format("%s|%s", pid, timestamp);
+		if (this.CostCache.containsKey(cachekey)) return this.CostCache.get(cachekey);
 		try {
 			mongo = new Mongo(this.host, this.port);
 		} catch (UnknownHostException e) {
@@ -321,7 +386,7 @@ public class Task implements Runnable {
 			return ret;
 		}
 		if (mongo != null) {
-			String today = new SimpleDateFormat("yyyyMMdd").format(new Date());
+			String today = new SimpleDateFormat("yyyyMMdd").format(d);			
 			DBCollection col = mongo.getDB(this.database).getCollection("DayDetail");
 			DBObject query = new BasicDBObject();
 			query.put("pid", pid);
@@ -341,6 +406,7 @@ public class Task implements Runnable {
 					e.printStackTrace();
 				}
 			}
+			this.CostCache.put(cachekey, ret);
 		}
 		mongo.close();
 		return ret;
@@ -354,16 +420,13 @@ public class Task implements Runnable {
 		try {
 			transport.open();
 		} catch (TTransportException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 		try {
 			System.out.println("stop plan:"+pid+"("+client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED)+")");
 		} catch (NumberFormatException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		} catch (TException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 		transport.close();	
@@ -377,7 +440,6 @@ public class Task implements Runnable {
 		try {
 			transport.open();
 		} catch (TTransportException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 		ArrayList<String> pids = new ArrayList<String>();
@@ -387,32 +449,24 @@ public class Task implements Runnable {
 				pids.add(String.valueOf(ap.plan_id));
 			}
 		} catch (NumberFormatException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (TException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		for (String pid:pids) {
 			try {
 				System.out.println("frozen plan:"+pid+"("+client.updateAdPlanStatus(Integer.parseInt(pid), PlanStatus.STOPPED)+")");
 			} catch (NumberFormatException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			} catch (TException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 		}
 		transport.close();	
 		
 	}
-
-	private void CutDown(String uid, float charge) {
-//		System.out.println("Cut Down");
-		//try {
-			//Class.forName(this.driver);
-			//Connection conn = null;
+	 
+	private void CutDown(String uid, Double charge) {
 			if (this.conn == null) {
 				try {
 					this.conn = DriverManager.getConnection(this.url, this.user, this.password);
@@ -423,19 +477,11 @@ public class Task implements Runnable {
 			Statement statement = null;
 			try {
 				statement = conn.createStatement();
-				System.out.println(charge);
-				//statement.executeUpdate("update adp_user_info set account=account-" + String.valueOf(charge) + " where uid=" + uid);
-				System.out.println("update adp_user_info set account=account-" + String.format("%s", charge*1000) + "/1000 where uid=" + uid);
-				statement.executeUpdate("update adp_user_info set account=account-" + String.format("%s", charge*1000) + "/1000 where uid=" + uid);
-				
+				statement.executeUpdate("update adp_user_info set account=account-" + String.format("%s", charge) + " where uid=" + uid);
 				statement.close();
-//				conn.close();
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
-		//} catch (ClassNotFoundException e) {
-		//	e.printStackTrace();
-		//}
 	}
 
 	@Override
@@ -457,24 +503,28 @@ public class Task implements Runnable {
 			String line = null;
 			File f = new File(InputPath);
 			if (f.exists()) {
+				String timestmp = new SimpleDateFormat("yyyyMMddhhmm").format(new Date());
 				System.out.println("log found.");
 				try {
 					System.out.println("GO");
 					BufferedReader br = new BufferedReader(
 							new InputStreamReader(new FileInputStream(f)));
+					HashMap<String, Long> psave = new HashMap<String, Long>();
+					HashMap<String, Long> ssave = new HashMap<String, Long>();
+					HashMap<String, Long> csave = new HashMap<String, Long>();
+					HashMap<String, Double> costsave = new HashMap<String, Double>();
+					HashMap<String, Double> cdsave = new HashMap<String, Double>();
 					while ((line = br.readLine()) != null) {
 						/* String[] segments = line.split(this.separator); */
+						
 						String[] segments = line.split("\u0001");
 						String[] segments2 = segments[0].split(" ");
 						if (segments.length >= 7 && segments2.length == 2) {
+//							System.out.println("in:"+System.nanoTime());
 							String type = segments2[1];
 							String version = segments[1];
 
-							String date = null;
-							String area = null;
-							String source = null;
-							String id = null;
-							String pushid = null;
+							String date = null, area = null, source = null, id = null, pushid = null;
 							boolean T = false;
 							int change = 0;
 							if (type.equals("rtb_creative") && version.equals("1")) {
@@ -533,22 +583,26 @@ public class Task implements Runnable {
 								type = "click";
 								change = 1;
 							}
+							double times = 0, times2 = 0;
+							//////////////////////
 							if (T && isvalid(type, pushid)) {
 //								System.out.println("Type:<" + type + "> Date:<"+ date + "> Area:<" + area+ "> Source:<" + source + "> ID:<" + id+ ">");
-								DBObject query = new BasicDBObject();
+//								times2 = System.nanoTime();
+								
+//								DBObject query = new BasicDBObject();
 								String info[] = this.getinfo(id);
 								String uid = info[0];
 								String pid = info[1];
 								String gid = info[2];
-								query.put("time", date);
-								query.put("uid", uid);
-								query.put("pid", pid);
-								query.put("gid", gid);
-								query.put("area", area);
-								query.put("source", source);
-								query.put("adid", id);
-								DBObject data = new BasicDBObject();
-								float charge = 0.0f;
+//								query.put("time", date);
+//								query.put("uid", uid);
+//								query.put("pid", pid);
+//								query.put("gid", gid);
+//								query.put("area", area);
+//								query.put("source", source);
+//								query.put("adid", id);
+//								DBObject data = new BasicDBObject();
+								double charge = 0.0f;
 								if (type.equals("bidres")) {
 									try {
 										charge = Float.parseFloat(segments[this.res_cost])/1000;
@@ -561,53 +615,127 @@ public class Task implements Runnable {
 								} else {
 									charge = 1;
 								}
-								data.put("$inc", new BasicDBObject(type, charge));
-								this.save("DayDetail", query, data);
-
-								query = new BasicDBObject();
-								query.put("pushid", pushid);
-								data = new BasicDBObject();
-								if(!type.equals("cost")) {
-									data.put("$inc", new BasicDBObject("status", change));
-									data.put("$set", new BasicDBObject("timestamp", System.currentTimeMillis()));
-									this.save("pushidstatus", query, data);
+								
+//								data.put("$inc", new BasicDBObject(type, charge));
+//								System.out.println("Set:"+(System.nanoTime()-times2)/1000);
+								String querykey = String.format("%s,%s,%s,%s,%s,%s,%s", date, uid, pid, gid, area, source, id);
+//								times = System.nanoTime();
+								// TODO NOTICE
+//								this.save("DayDetail", query, data);
+								if (type.equals("push")) {
+									if (psave.containsKey(querykey)) psave.put(querykey, psave.get(querykey)+1);
+									else psave.put(querykey, 1L);
+								} else if (type.equals("show")) {
+									if (ssave.containsKey(querykey)) ssave.put(querykey, ssave.get(querykey)+1);
+									else ssave.put(querykey, 1L);
+								} else if (type.equals("click")) {
+									if (csave.containsKey(querykey)) csave.put(querykey, csave.get(querykey)+1);
+									else csave.put(querykey, 1L);
+								} else if (type.equals("cost")) {
+									if (costsave.containsKey(querykey)) costsave.put(querykey, costsave.get(querykey)+charge);
+									else costsave.put(querykey, charge);
 								}
+								
+//								System.out.println("Save:"+(System.nanoTime()-times)/1000);
+								
+								times = System.nanoTime();
+								if (this.PSCStatusCache.containsKey(pushid)) {
+									this.PSCStatusCache.put(pushid, this.PSCStatusCache.get(pushid)+change);
+								} else {
+									this.PSCStatusCache.put(pushid, change);
+								}
+//								System.out.println("PSC:"+(System.nanoTime()-times)/1000);
+								
+								// TODO NOTICE
 								if (type.equals("cost")) {
-//									System.out.println("cost found");
-									CutDown(uid, charge);
-									float TodayGroupCost = getDayCost(pid);
-									float budget = 0.0f;
-									//Class.forName(this.driver);
-									if(this.conn==null) {
-										this.conn = DriverManager.getConnection(this.url, this.user, this.password);
-									}
-									Statement statement = conn.createStatement();
-									String sql = "select budget from adp_plan_info where plan_id="+ pid;
-									ResultSet rs = statement.executeQuery(sql);
-									while (rs.next())budget = rs.getFloat("budget");
-									float account = 0.0f;
-									sql = "select account from adp_user_info where uid="+ uid;
-									rs = statement.executeQuery(sql);
-									while (rs.next())account = rs.getFloat("account");
-									rs.close();
-									System.out.println("charge="+ String.valueOf(charge) + ",uid="+ String.valueOf(uid) + ",pid="+ String.valueOf(pid) + ",Budget="+ String.valueOf(budget)+ ",TodayPlanCost="+ String.valueOf(TodayGroupCost)+ ",account="+ String.valueOf(account));
-									if (TodayGroupCost >= budget) {
+//									times = System.nanoTime();
+//									CutDown(uid, charge);
+									if (cdsave.containsKey(uid)) cdsave.put(uid, cdsave.get(uid)+charge);
+									else cdsave.put(uid, charge);
+									double TodayGroupCost = getDayCost(timestmp, pid);
+									double budget = getBudget(timestmp, pid);
+									double account = getAccount(timestmp, uid);
+									
+									if (budget>0&&TodayGroupCost >= budget) {
 										StopAPlan(pid);
 									}
 									if (account <= 0) {
 										StopAllPlan(uid);
 									}
-									statement.close();
-//									conn.close();
+//									System.out.println("cost:"+(System.nanoTime()-times)/1000);
 								}
-
-							} else {
-//								System.out.println("unknown type");
+								
 							}
+//							System.out.println("total:"+(System.nanoTime()-times2)/1000);
+							/////////////////////////
 						} else {
 							System.out.print(Arrays.toString(segments));
 							System.out.println("bad record.");
 						}
+					}
+					for(String i : psave.keySet()) {
+						DBObject query = new BasicDBObject();
+						String seg[] = i.split(",");
+						query.put("time", seg[0]);
+						query.put("uid", seg[1]);
+						query.put("pid", seg[2]);
+						query.put("gid", seg[3]);
+						query.put("area", seg[4]);
+						query.put("source", seg[5]);
+						query.put("adid", seg[6]);
+						DBObject data = new BasicDBObject();
+						data.put("$inc", new BasicDBObject("push", psave.get(i)));
+//						System.out.println("Push:"+i+":"+psave.get(i));
+						this.save("DayDetail", query, data);
+					}
+					for(String i : ssave.keySet()) {
+						DBObject query = new BasicDBObject();
+						String seg[] = i.split(",");
+						query.put("time", seg[0]);
+						query.put("uid", seg[1]);
+						query.put("pid", seg[2]);
+						query.put("gid", seg[3]);
+						query.put("area", seg[4]);
+						query.put("source", seg[5]);
+						query.put("adid", seg[6]);
+						DBObject data = new BasicDBObject();
+						data.put("$inc", new BasicDBObject("show", ssave.get(i)));
+//						System.out.println("Show:"+i+":"+ssave.get(i));
+						this.save("DayDetail", query, data);
+					}
+					for(String i : csave.keySet()) {
+						DBObject query = new BasicDBObject();
+						String seg[] = i.split(",");
+						query.put("time", seg[0]);
+						query.put("uid", seg[1]);
+						query.put("pid", seg[2]);
+						query.put("gid", seg[3]);
+						query.put("area", seg[4]);
+						query.put("source", seg[5]);
+						query.put("adid", seg[6]);
+						DBObject data = new BasicDBObject();
+						data.put("$inc", new BasicDBObject("click", csave.get(i)));
+//						System.out.println("Click:"+i+":"+csave.get(i));
+						this.save("DayDetail", query, data);
+					}
+					for(String i : costsave.keySet()) {
+						DBObject query = new BasicDBObject();
+						String seg[] = i.split(",");
+						query.put("time", seg[0]);
+						query.put("uid", seg[1]);
+						query.put("pid", seg[2]);
+						query.put("gid", seg[3]);
+						query.put("area", seg[4]);
+						query.put("source", seg[5]);
+						query.put("adid", seg[6]);
+						DBObject data = new BasicDBObject();
+						data.put("$inc", new BasicDBObject("cost", costsave.get(i)));
+//						System.out.println("Cost:"+i+":"+costsave.get(i));
+						this.save("DayDetail", query, data);
+					}
+					for(String i : cdsave.keySet()) {
+						System.out.println("CutDown:"+i+":"+cdsave.get(i));
+						CutDown(i, cdsave.get(i));
 					}
 					System.out.println("OK");
 					br.close();
