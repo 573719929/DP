@@ -785,7 +785,7 @@ public class Task implements Runnable {
 				}
 				// Reduce Cache
 		        HashSet<String> toBeClean = new HashSet<String>();
-		        long timestampl2 = timestampl - 3600;
+		        long timestampl2 = timestampl - 600;
 		        for (String id : this.PSCStatusCache.keySet()) {
 		        	if (this.PSCStatusCacheTimestamp.get(id)<timestampl2) {
 		        		toBeClean.add(id);
@@ -793,8 +793,9 @@ public class Task implements Runnable {
 		        }
 		        for(Iterator<String> it=toBeClean.iterator();it.hasNext();)
 		        {
-		        	this.PSCStatusCache.remove(it);
-		        	this.PSCStatusCacheTimestamp.remove(it);
+		        	String id = it.next();
+		        	this.PSCStatusCache.remove(id);
+		        	this.PSCStatusCacheTimestamp.remove(id);
 		        }
 		        toBeClean.clear();
 		        for (String id : this.CostStatusCache.keySet()) {
@@ -804,8 +805,9 @@ public class Task implements Runnable {
 		        }
 		        for(Iterator<String> it=toBeClean.iterator();it.hasNext();)
 		        {
-		        	this.CostStatusCache.remove(it);
-		        	this.CostStatusCacheTimestamp.remove(it);
+		        	String id = it.next();
+		        	this.CostStatusCache.remove(id);
+		        	this.CostStatusCacheTimestamp.remove(id);
 		        }
 		        
 			} else {
