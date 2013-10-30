@@ -13,7 +13,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 
@@ -38,9 +40,15 @@ import org.apache.thrift.transport.TTransportException;
 
 public class Task implements Runnable {
 	private HashMap<String, Double> CostCache;
+    private HashMap<String, Double> CostCacheTimestamp;
 	private HashMap<String, Integer> CostStatusCache;
+    private HashMap<String, Long> CostStatusCacheTimestamp;
 	private HashMap<String, Integer> PSCStatusCache;
+    private HashMap<String, Long> PSCStatusCacheTimestamp;
 	private HashMap<String, Double> AccountCache;
+    private HashMap<String, Double> AccountCacheTimestamp;
+    private HashMap<String, Double> BudgetCache;
+    private HashMap<String, Double> BudgetCacheTimestamp;
 	private SimpleDateFormat formater = null;
 	private String host = null;
 	private int port = 0;
@@ -81,7 +89,7 @@ public class Task implements Runnable {
 	private int res_pushid = 0;
 	private int res_cost = 0;
 	private Connection conn = null;
-	private HashMap<String, Double> BudgetCache;
+	
 
 	public Task(String h, int p, String d, String pf, String sf, String url,
 			String user, String password, String pat, String sep,
@@ -98,6 +106,8 @@ public class Task implements Runnable {
 		}
 		this.CostCache = new HashMap<String, Double>();
 		this.CostStatusCache = new HashMap<String, Integer>();
+		this.CostStatusCacheTimestamp = new HashMap<String, Long>();
+		this.PSCStatusCacheTimestamp = new HashMap<String, Long>();
 		this.PSCStatusCache = new HashMap<String, Integer>();
 		this.AccountCache = new HashMap<String, Double>();
 		this.BudgetCache = new HashMap<String, Double>();
@@ -271,23 +281,48 @@ public class Task implements Runnable {
 	}
 
 	public boolean isvalid(String type, String pushid) {
-		if (type.equals("bidres")) return isvalidcost(pushid);
-		boolean b = this.PSCStatusCache.containsKey(pushid);
-		if (!b&&type.equals("push"))return true;
-		if (b) {
-			int a = this.PSCStatusCache.get(pushid);
-			if (a == 4 && type.equals("show")) return true;
-			else if (a == 6 && type.equals("click")) return true;
-			else return false;
-		} else return false;
+		boolean ret = false;// String retmsg = "";
+		if (type.equals("bidres")) {
+			ret = isvalidcost(pushid);
+//			retmsg = "to isvalid cost";
+		}
+		else {
+			boolean b = this.PSCStatusCache.containsKey(pushid);
+//			System.out.println(this.PSCStatusCache.size());
+			if (b) {
+				int a = this.PSCStatusCache.get(pushid);
+//				System.out.println(a);
+				if (a == 4 && type.equals("show")) {
+					ret = true;
+//					retmsg = "b is true and value is 4";
+				} else if (a == 6 && type.equals("click")) {
+					ret = true;
+//					retmsg = "b is true and value is 6";
+				} else {
+//					retmsg = "b is true and value is other status";
+					ret = false;
+				}
+			} else {
+				if (type.equals("push")) {
+					ret = true;
+//					retmsg = "b is false and type is push";
+				} else {
+//					retmsg = "b is f/alse and type is others";
+					ret = false;
+				}
+			}
+		}
+//		System.out.println(type+" - "+pushid+" : "+ret + " => " + retmsg);
+		return ret;
 	}
 
 	public boolean isvalidcost(String pushid) {
 		return !this.CostStatusCache.containsKey(pushid);
 	}
 
-	public boolean changestat(String pushid) {
+	public boolean changestat(String pushid, long timestamp) {
 		this.CostStatusCache.put(pushid, 1);
+        this.CostStatusCacheTimestamp.put(pushid, timestamp);
 		return true;
 	}
 
@@ -406,8 +441,9 @@ public class Task implements Runnable {
 					e.printStackTrace();
 				}
 			}
-			this.CostCache.put(cachekey, ret);
+			
 		}
+        this.CostCache.put(cachekey, ret);
 		mongo.close();
 		return ret;
 	}
@@ -504,6 +540,7 @@ public class Task implements Runnable {
 			File f = new File(InputPath);
 			if (f.exists()) {
 				String timestmp = new SimpleDateFormat("yyyyMMddhhmm").format(new Date());
+                long timestampl = currentTimestamp/1000;
 				System.out.println("log found.");
 				try {
 					System.out.println("GO");
@@ -583,7 +620,7 @@ public class Task implements Runnable {
 								type = "click";
 								change = 1;
 							}
-							double times = 0, times2 = 0;
+//							double times = 0, times2 = 0;
 							//////////////////////
 							if (T && isvalid(type, pushid)) {
 //								System.out.println("Type:<" + type + "> Date:<"+ date + "> Area:<" + area+ "> Source:<" + source + "> ID:<" + id+ ">");
@@ -607,7 +644,7 @@ public class Task implements Runnable {
 									try {
 										charge = Float.parseFloat(segments[this.res_cost])/1000;
 										if(charge>0 && charge<0.01){
-											changestat(pushid);
+											changestat(pushid, timestampl);
 											type = "cost";
 										}
 									} catch (Exception e) {
@@ -638,12 +675,8 @@ public class Task implements Runnable {
 								
 //								System.out.println("Save:"+(System.nanoTime()-times)/1000);
 								
-								times = System.nanoTime();
-								if (this.PSCStatusCache.containsKey(pushid)) {
-									this.PSCStatusCache.put(pushid, this.PSCStatusCache.get(pushid)+change);
-								} else {
-									this.PSCStatusCache.put(pushid, change);
-								}
+//								times = System.nanoTime();
+								
 //								System.out.println("PSC:"+(System.nanoTime()-times)/1000);
 								
 								// TODO NOTICE
@@ -663,6 +696,14 @@ public class Task implements Runnable {
 										StopAllPlan(uid);
 									}
 //									System.out.println("cost:"+(System.nanoTime()-times)/1000);
+								} else {
+									if (this.PSCStatusCache.containsKey(pushid)) {
+										this.PSCStatusCache.put(pushid, this.PSCStatusCache.get(pushid)+change);
+	                                    this.PSCStatusCacheTimestamp.put(pushid, timestampl);
+									} else {
+										this.PSCStatusCache.put(pushid, change);
+	                                    this.PSCStatusCacheTimestamp.put(pushid, timestampl);
+									}
 								}
 								
 							}
@@ -685,7 +726,7 @@ public class Task implements Runnable {
 						query.put("adid", seg[6]);
 						DBObject data = new BasicDBObject();
 						data.put("$inc", new BasicDBObject("push", psave.get(i)));
-//						System.out.println("Push:"+i+":"+psave.get(i));
+						System.out.println("Push:"+i+":"+psave.get(i));
 						this.save("DayDetail", query, data);
 					}
 					for(String i : ssave.keySet()) {
@@ -700,7 +741,7 @@ public class Task implements Runnable {
 						query.put("adid", seg[6]);
 						DBObject data = new BasicDBObject();
 						data.put("$inc", new BasicDBObject("show", ssave.get(i)));
-//						System.out.println("Show:"+i+":"+ssave.get(i));
+						System.out.println("Show:"+i+":"+ssave.get(i));
 						this.save("DayDetail", query, data);
 					}
 					for(String i : csave.keySet()) {
@@ -715,7 +756,7 @@ public class Task implements Runnable {
 						query.put("adid", seg[6]);
 						DBObject data = new BasicDBObject();
 						data.put("$inc", new BasicDBObject("click", csave.get(i)));
-//						System.out.println("Click:"+i+":"+csave.get(i));
+						System.out.println("Click:"+i+":"+csave.get(i));
 						this.save("DayDetail", query, data);
 					}
 					for(String i : costsave.keySet()) {
@@ -730,7 +771,7 @@ public class Task implements Runnable {
 						query.put("adid", seg[6]);
 						DBObject data = new BasicDBObject();
 						data.put("$inc", new BasicDBObject("cost", costsave.get(i)));
-//						System.out.println("Cost:"+i+":"+costsave.get(i));
+						System.out.println("Cost:"+i+":"+costsave.get(i));
 						this.save("DayDetail", query, data);
 					}
 					for(String i : cdsave.keySet()) {
@@ -742,15 +783,43 @@ public class Task implements Runnable {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+				// Reduce Cache
+		        HashSet<String> toBeClean = new HashSet<String>();
+		        long timestampl2 = timestampl - 3600;
+		        for (String id : this.PSCStatusCache.keySet()) {
+		        	if (this.PSCStatusCacheTimestamp.get(id)<timestampl2) {
+		        		toBeClean.add(id);
+		        	}
+		        }
+		        for(Iterator<String> it=toBeClean.iterator();it.hasNext();)
+		        {
+		        	this.PSCStatusCache.remove(it);
+		        	this.PSCStatusCacheTimestamp.remove(it);
+		        }
+		        toBeClean.clear();
+		        for (String id : this.CostStatusCache.keySet()) {
+		        	if (this.CostStatusCacheTimestamp.get(id)<timestampl2) {
+		        		toBeClean.add(id);
+		        	}
+		        }
+		        for(Iterator<String> it=toBeClean.iterator();it.hasNext();)
+		        {
+		        	this.CostStatusCache.remove(it);
+		        	this.CostStatusCacheTimestamp.remove(it);
+		        }
+		        
 			} else {
 				System.out.println("log miss!");
 			}
 			System.out.println("<end>");
 			mongo.close();
+			
 		} else {
 			System.out.println("<begin>can not connect mongodb<end>");
 		}
 		System.out.println("task complete at " + new Date().toString());
+		
+		
 	}
 
 }
