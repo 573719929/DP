@@ -785,7 +785,8 @@ public class Task implements Runnable {
 				}
 				// Reduce Cache
 		        HashSet<String> toBeClean = new HashSet<String>();
-		        long timestampl2 = timestampl - 600;
+		        long timestampl2 = timestampl - 1800;
+		        long timestampl3 = timestampl - 1800;
 		        for (String id : this.PSCStatusCache.keySet()) {
 		        	if (this.PSCStatusCacheTimestamp.get(id)<timestampl2) {
 		        		toBeClean.add(id);
