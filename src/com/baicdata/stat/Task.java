@@ -544,6 +544,8 @@ public class Task implements Runnable {
 				System.out.println("log found.");
 				try {
 					System.out.println("GO");
+					HashMap<String, Integer> StopPlans = new HashMap<String, Integer>();
+					HashMap<String, Integer> StopUids = new HashMap<String, Integer>();
 					BufferedReader br = new BufferedReader(
 							new InputStreamReader(new FileInputStream(f)));
 					HashMap<String, Long> psave = new HashMap<String, Long>();
@@ -690,10 +692,12 @@ public class Task implements Runnable {
 									double account = getAccount(timestmp, uid);
 									
 									if (budget>0&&TodayGroupCost >= budget) {
-										StopAPlan(pid);
+										//StopAPlan(pid);
+										StopPlans.put(pid, 1);
 									}
 									if (account <= 0) {
-										StopAllPlan(uid);
+										//StopAllPlan(uid);
+										StopUids.put(uid, 1);
 									}
 //									System.out.println("cost:"+(System.nanoTime()-times)/1000);
 								} else {
@@ -713,6 +717,12 @@ public class Task implements Runnable {
 							System.out.print(Arrays.toString(segments));
 							System.out.println("bad record.");
 						}
+					}
+					for (String i:StopPlans.keySet()) {
+						StopAPlan(i);
+					}
+					for (String i:StopUids.keySet()) {
+						StopAllPlan(i);
 					}
 					for(String i : psave.keySet()) {
 						DBObject query = new BasicDBObject();
@@ -810,6 +820,8 @@ public class Task implements Runnable {
 		        	this.CostStatusCache.remove(id);
 		        	this.CostStatusCacheTimestamp.remove(id);
 		        }
+		        
+		        
 		        
 			} else {
 				System.out.println("log miss!");

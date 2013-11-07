@@ -15,7 +15,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -74,6 +76,7 @@ public class Worker implements ReportService.Iface {
 
 	private reportResult parse(queryOptions q, pageOptions p, String input,
 			String output) {
+		System.out.println(String.format("input at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 		reportResult r = new reportResult();
 		r.setTotalPage(0);
 		r.setCurrentSize(0);
@@ -137,13 +140,15 @@ public class Worker implements ReportService.Iface {
 			
 			String reduce = "function(curr,result){if(curr.push!=null)result.push+=(+curr.push);if(curr.show!=null)result.show+=(+curr.show);if(curr.click!=null)result.click+=(+curr.click);if(curr.cost!=null)result.cost+=(+curr.cost);}";
 			
-			System.out.println(key);
-			System.out.println(cond);
-			System.out.println(initial);
-			System.out.println(reduce);
+//			System.out.println(key);
+//			System.out.println(cond);
+//			System.out.println(initial);
+//			System.out.println(reduce);
 			DBObject b = null;
 			try{
+				System.out.println(String.format(">> at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 				b = col.group(key, cond, initial, reduce);
+				System.out.println(String.format(">> at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 			}catch(Exception e) {e.printStackTrace();}
 			
 			
@@ -212,6 +217,8 @@ public class Worker implements ReportService.Iface {
 		r.setPageNumber(p.getPageNumber());
 		
 		this.mongo = null;
+		System.out.println(String.format("output at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+		System.out.println("\n");
 		return r;
 	}
 
