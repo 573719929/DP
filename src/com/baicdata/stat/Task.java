@@ -531,7 +531,7 @@ public class Task implements Runnable {
 		}
 		if (mongo != null) {
 			this.db = mongo.getDB(this.database);
-			long currentTimestamp = System.currentTimeMillis() - 30000;
+			long currentTimestamp = System.currentTimeMillis() - 90000;
 			String RunAt = this.formater.format(new Date(currentTimestamp));
 			String InputPath = this.prefix + RunAt + this.suffix;
 			System.out.println("<begin>");
@@ -795,8 +795,8 @@ public class Task implements Runnable {
 				}
 				// Reduce Cache
 		        HashSet<String> toBeClean = new HashSet<String>();
-		        long timestampl2 = timestampl - 1800;
-		        long timestampl3 = timestampl - 1800;
+		        long timestampl2 = timestampl - 720;
+		        long timestampl3 = timestampl - 120;
 		        for (String id : this.PSCStatusCache.keySet()) {
 		        	if (this.PSCStatusCacheTimestamp.get(id)<timestampl2) {
 		        		toBeClean.add(id);
@@ -810,7 +810,7 @@ public class Task implements Runnable {
 		        }
 		        toBeClean.clear();
 		        for (String id : this.CostStatusCache.keySet()) {
-		        	if (this.CostStatusCacheTimestamp.get(id)<timestampl2) {
+		        	if (this.CostStatusCacheTimestamp.get(id)<timestampl3) {
 		        		toBeClean.add(id);
 		        	}
 		        }

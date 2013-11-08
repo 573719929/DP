@@ -17,9 +17,11 @@ import java.io.InputStream;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Dictionary;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -91,105 +93,147 @@ public class Worker implements ReportService.Iface {
 				return r;
 			}
 		}
-		
+//		System.out.println(String.format("A: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 		int total = 0;
 		if (this.mongo != null) {
 			DBCollection col = this.mongo.getDB(this.database).getCollection("DayDetail");
 			DBObject query = new BasicDBObject();
+			
 			query.put(input, q.id);
+			
 			DBObject datetime = new BasicDBObject();
-			datetime.put("$gte", q.startAt);
-			datetime.put("$lte", q.endAt);
+			datetime.put("$gte", q.startAt); datetime.put("$lte", q.endAt);
 			query.put("time", datetime);
 			
 			DBObject area = new BasicDBObject();
-			if (q.areaid != null && !q.areaid.isEmpty()) {
-				area.put("$in", q.areaid);
-				query.put("area", area);
-			}
+			if (q.areaid != null && !q.areaid.isEmpty()) { area.put("$in", q.areaid);
+			query.put("area", area); }
 			
 			String source = null;
-			if (q.source == FlowSrc.self_media) {
-				source = "self_media";
-			} else if (q.source == FlowSrc.doubleclick) {
-				source = "doubleclick";
-			} else if (q.source == FlowSrc.sax) {
-				source = "sax";
-			} else if (q.source == FlowSrc.tanx) {
-				source = "tanx";
-			} else if (q.source == FlowSrc.tencent) {
-				source = "tencent";
-			} else if (q.source == FlowSrc.youku) {
-				source = "youku";
-			}
-			
-			if (source != null)
-				query.put("source", source);
+			if (q.source == FlowSrc.self_media)source = "self_media";
+			else if (q.source == FlowSrc.doubleclick)source = "doubleclick";
+			else if (q.source == FlowSrc.sax)source = "sax";
+			else if (q.source == FlowSrc.tanx)source = "tanx";
+			else if (q.source == FlowSrc.tencent)source = "tencent";
+			else if (q.source == FlowSrc.youku)source = "youku";
+			if (source != null)query.put("source", source);
 
 			DBObject key = new BasicDBObject();
-			//key.put(output, q.id);
 			key.put(output, true);
-			
-			DBObject cond = new BasicDBObject();
-			cond = query;
+			key.put("push", true);
+			key.put("show", true);
+			key.put("click", true);
+			key.put("cost", true);
+			/*
 			DBObject initial = new BasicDBObject();
-			
 			initial.put("push", 0);
 			initial.put("show", 0);
 			initial.put("click", 0);
 			initial.put("cost", 0);
+			String reduce = "function(curr,result){
+			if(curr.push!=null)result.push+=(+curr.push);
+			if(curr.show!=null)result.show+=(+curr.show);
+			if(curr.click!=null)result.click+=(+curr.click);
+			if(curr.cost!=null)result.cost+=(+curr.cost);
+			}";
+			*/
 			
-			
-			String reduce = "function(curr,result){if(curr.push!=null)result.push+=(+curr.push);if(curr.show!=null)result.show+=(+curr.show);if(curr.click!=null)result.click+=(+curr.click);if(curr.cost!=null)result.cost+=(+curr.cost);}";
-			
-//			System.out.println(key);
-//			System.out.println(cond);
-//			System.out.println(initial);
-//			System.out.println(reduce);
-			DBObject b = null;
+			HashMap<String, Double> Pd = new HashMap<String, Double>();
+			HashMap<String, Double> Sd = new HashMap<String, Double>();
+			HashMap<String, Double> Cd = new HashMap<String, Double>();
+			HashMap<String, Double> Qd = new HashMap<String, Double>();
 			try{
-				b = col.group(key, cond, initial, reduce); // Slowly damn.
-				}catch(Exception e) {e.printStackTrace();}
-			List<Object> returnList = (BasicDBList) b;
+				//b = col.group(key, query, initial, reduce); // Slowly damn.
+//				System.out.println(query);
+//				System.out.println(key);
+//				System.out.println(String.format("B: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+				DBCursor b = col.find(query, key);
+				System.out.println(String.format("C: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+				// Slow Start
+				while (b.hasNext()) {
+					DBObject t = b.next();
+					String k = (String) t.get(output);
+					Object pp = t.get("push");
+					Object ss = t.get("show");
+					Object cc = t.get("click");
+					Object coco = t.get("cost");
+					if (pp != null) {
+						if (Pd.containsKey(k)) {
+							Pd.put(k, Pd.get(k)+Double.parseDouble(pp.toString()));
+						} else {
+							Pd.put(k, Double.parseDouble(pp.toString()));
+						}
+					}
+					if (ss != null) {
+						if (Sd.containsKey(k)) {
+							Sd.put(k, Sd.get(k)+Double.parseDouble(ss.toString()));
+						} else {
+							Sd.put(k, Double.parseDouble(ss.toString()));
+						}
+					}
+					if (cc != null) {
+						if (Cd.containsKey(k)) {
+							Cd.put(k, Cd.get(k)+Double.parseDouble(cc.toString()));
+						} else {
+							Cd.put(k, Double.parseDouble(cc.toString()));
+						}
+					}
+					if (coco != null) {
+						if (Qd.containsKey(k)) {
+							Qd.put(k, Qd.get(k)+Double.parseDouble(coco.toString()));
+						} else {
+							Qd.put(k, Double.parseDouble(coco.toString()));
+						}
+					}
+				}
+				// Slow end
+				System.out.println(String.format("D: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+			}catch(Exception e) {e.printStackTrace();}			
+			//List<Object> returnList = (BasicDBList) b;
 			
-			total = returnList.size();
+			ArrayList<String> rr = new ArrayList<String>();
+			for (String i : Pd.keySet()) rr.add(i);
+//			System.out.println(String.format("E: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+			Collections.sort(rr);
+//			System.out.println(String.format("F: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
+			total = rr.size();
 			int fromIndex = p.pageSize * (p.pageNumber - 1), toIndex = p.pageSize * (p.pageNumber);
 			if (fromIndex < 0) fromIndex = 0;
-			if (toIndex > returnList.size()) toIndex = returnList.size();
-			
+			if (toIndex > rr.size()) toIndex = rr.size();
+//			System.out.println(String.format("G: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 			if (total > 0 && toIndex >= fromIndex) {
-				returnList = returnList.subList(fromIndex, toIndex);
-				DBObject t = null;
+				List<String> returnList = rr.subList(fromIndex, toIndex);
+				String t = null;
 				for (int i = 0; i < returnList.size(); i++) {
-					t = (DBObject) returnList.get(i);
+					t = returnList.get(i);
 					String id = null;
 					try {
-						id = t.get(output).toString();
+						id = t;
 					} catch (java.lang.NullPointerException e) {
 					}
 					int push = 0, show = 0, click = 0;
 					double cost = 0.0;
 					try {
-						push = Float.valueOf(t.get("push").toString()).intValue();
+						push = Pd.get(t).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
-						show = Float.valueOf(t.get("show").toString()).intValue();
+						show = Sd.get(t).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
-						click = Float.valueOf(t.get("click").toString()).intValue();
+						click = Cd.get(t).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
-						cost = Float.valueOf(t.get("cost").toString());
+						cost = Qd.get(t);
 					} catch (java.lang.NullPointerException e) {
 					}
 					r.data.add(new Response(id, push, show, click, cost));
 				}
 			}
 		}
-		
+//		System.out.println(String.format("H: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 //		this.mongo.close();
 		r.setTotalSize(total);
 		r.setCurrentSize(r.getData().size());
