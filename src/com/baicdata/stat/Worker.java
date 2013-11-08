@@ -84,10 +84,12 @@ public class Worker implements ReportService.Iface {
 		r.setPageNumber(0);
 		r.setData(new ArrayList<Response>());
 		
-		try {
-			this.mongo = new Mongo(this.host, this.port);
-		} catch (UnknownHostException e) {
-			return r;
+		if (this.mongo == null) {
+			try {
+				this.mongo = new Mongo(this.host, this.port);
+			} catch (UnknownHostException e) {
+				return r;
+			}
 		}
 		
 		int total = 0;
@@ -146,30 +148,19 @@ public class Worker implements ReportService.Iface {
 //			System.out.println(reduce);
 			DBObject b = null;
 			try{
-				System.out.println(String.format(">> at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
-				b = col.group(key, cond, initial, reduce);
-				System.out.println(String.format(">> at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
-			}catch(Exception e) {e.printStackTrace();}
-			
-			
+				b = col.group(key, cond, initial, reduce); // Slowly damn.
+				}catch(Exception e) {e.printStackTrace();}
 			List<Object> returnList = (BasicDBList) b;
 			
 			total = returnList.size();
-			int fromIndex = p.pageSize * (p.pageNumber - 1);
-			
-			if (fromIndex < 0)
-				fromIndex = 0;
-			int toIndex = p.pageSize * (p.pageNumber);
-			if (toIndex > returnList.size())
-				toIndex = returnList.size();
+			int fromIndex = p.pageSize * (p.pageNumber - 1), toIndex = p.pageSize * (p.pageNumber);
+			if (fromIndex < 0) fromIndex = 0;
+			if (toIndex > returnList.size()) toIndex = returnList.size();
 			
 			if (total > 0 && toIndex >= fromIndex) {
-
 				returnList = returnList.subList(fromIndex, toIndex);
 				DBObject t = null;
-				
 				for (int i = 0; i < returnList.size(); i++) {
-
 					t = (DBObject) returnList.get(i);
 					String id = null;
 					try {
@@ -179,31 +170,27 @@ public class Worker implements ReportService.Iface {
 					int push = 0, show = 0, click = 0;
 					double cost = 0.0;
 					try {
-						push = Float.valueOf(t.get("push").toString())
-								.intValue();
+						push = Float.valueOf(t.get("push").toString()).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
-						show = Float.valueOf(t.get("show").toString())
-								.intValue();
+						show = Float.valueOf(t.get("show").toString()).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
-						click = Float.valueOf(t.get("click").toString())
-								.intValue();
+						click = Float.valueOf(t.get("click").toString()).intValue();
 					} catch (java.lang.NullPointerException e) {
 					}
 					try {
 						cost = Float.valueOf(t.get("cost").toString());
 					} catch (java.lang.NullPointerException e) {
 					}
-					
 					r.data.add(new Response(id, push, show, click, cost));
 				}
 			}
 		}
 		
-		this.mongo.close();
+//		this.mongo.close();
 		r.setTotalSize(total);
 		r.setCurrentSize(r.getData().size());
 		
@@ -216,7 +203,7 @@ public class Worker implements ReportService.Iface {
 		}
 		r.setPageNumber(p.getPageNumber());
 		
-		this.mongo = null;
+//		this.mongo = null;
 		System.out.println(String.format("output at: %s", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss - SS").format(new Date())));
 		System.out.println("\n");
 		return r;
